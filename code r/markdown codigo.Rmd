@@ -1,0 +1,456 @@
+---
+title: "lab1_modelos"
+author: "Isidora Muñoz y Martin Yáñez"
+date: "2026-09-13"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r cars}
+library(tidyverse)  # Incluye readr, dplyr, ggplot2
+library(corrplot)
+# Para mapas de calor de correlaciones
+```
+
+## Ejercicio 1. Publicidad y Ventas
+
+### a) Análisis Exploratorio de Datos (EDA)
+#### 1. Lectura de datos y primeros registros
+```{r}
+
+data <- read.delim("ventas.txt", sep = "\t")
+head(data)
+```
+#### 2. Dimensiones y estructura de la base 
+```{r}
+
+dim(data)
+
+str(data)
+```
+#### 3. Identificación de datos faltantes
+```{r}
+colSums(is.na(data))
+```
+#### 4. Medidas descriptivas
+```{r}
+summary(data)
+```
+#### 5. Matriz de correlaciones y mapa de calor
+```{r}
+# Matriz numérica redondeada a 3 decimales
+matriz_cor <- cor(data)
+round(matriz_cor, 3)
+
+# Mapa de calor de correlación
+corrplot(matriz_cor, 
+         method = "color", 
+         type = "upper", 
+         addCoef.col = "black", 
+         tl.col = "black", 
+         tl.srt = 45)
+```
+
+#### 6. Gráficos de dispersión: Ventas vs. Predictores
+```{r}
+# Transformación a formato largo para graficar con facet_wrap en ggplot2
+data_largo <- data %>%
+  pivot_longer(cols = c(tv, radio, periodico), 
+               names_to = "medio", 
+               values_to = "inversion")
+
+ggplot(data_largo, aes(x = inversion, y = ventas)) +
+  geom_point(alpha = 0.6, color = "steelblue") +
+  geom_smooth(method = "lm", se = FALSE, color = "darkred") +
+  facet_wrap(~ medio, scales = "free_x") +
+  scale_y_continuous(breaks = seq(5, 25, by = 5), limits = c(0, 28)) +
+  theme_classic() +
+  theme(
+    strip.placement = "outside",
+    strip.background = element_blank(),
+    strip.text = element_text(size = 11),
+    plot.title = element_text(hjust = 0.5, size = 13),
+    panel.spacing = unit(1, "lines")
+  ) +
+  labs(title = "Dispersión de Ventas vs Predictores",
+       x = NULL,
+       y = "ventas")
+```
+
+
+### b) Regresión Lineal Múltiple
+$$Ventas_i = \beta_0 + \beta_1 TV_i + \beta_2 Radio_i + \beta_3 Periodico_i + \varepsilon_i$$
+$$\text{donde } \varepsilon_i \overset{\text{iid}}{\sim} \mathcal{N}(0, \sigma^2)$$
+```{r}
+modelo <- lm(ventas ~ tv + radio + periodico, data = data)
+summary(modelo)
+```
+
+### c) Intervalo de Confianza para el Valor Medio Esperado (95 %)Punto de evaluación: 
+#### $\text{TV} = 147.05$, $\text{Radio} = 23.3$, $\text{Periodico} = 31$.
+
+```{r}
+data_media <- data.frame(tv = 147.05, radio = 23.3, periodico = 31)
+
+# interval = "confidence" calcula el IC para E(Y | X = x0)
+ic_media <- predict(modelo, newdata = data_media, interval = "confidence", level = 0.95)
+ic_media
+
+```
+
+
+### d) Intervalo de Predicción para una Nueva Sucursal (95 %)Escenario:
+#### $\text{TV} =160$, $\text{Radio} = 26.7$, $\text{Periódico} = 35.1$.
+
+```{r}
+data_media2 <- data.frame(tv = 160, radio = 26.7, periodico = 35.1)
+
+# interval = "prediction" calcula el IP para una observación individual
+ip_sucursal <- predict(modelo, newdata = data_media2, interval = "prediction", level = 0.95)
+ip_sucursal
+
+```
+
+
+
+### e) Diferencia Conceptual: Confianza vs. Predicción: 
+$E(Y \mid X = x_0)$ y $Y_{\text{nuevo}} \mid X = x_0$:$E(Y \mid X = x_0)$ 
+
+
+
+## Ejercicio 2. Biomasa y características del suelo
+
+### a) Análisis Exploratorio de Datos (EDA)
+
+#### 1. Lectura de datos y primeros registros
+
+```{r}
+data2 <- read.delim("datos.txt", sep = "\t")
+head(data2)
+```
+
+#### 2. Dimensiones y estructura de la base
+
+```{r}
+dim(data2)
+str(data2)
+```
+
+#### 3. Identificación de datos faltantes
+
+```{r}
+colSums(is.na(data2))
+```
+
+#### 4. Medidas descriptivas
+
+```{r}
+summary(data2)
+```
+
+#### 5. Matriz de correlaciones y mapa de calor
+
+```{r}
+matriz_cor2 <- cor(data2)
+round(matriz_cor2, 3)
+
+corrplot(matriz_cor2, 
+         method = "color", 
+         type = "upper", 
+         addCoef.col = "black", 
+         tl.col = "black", 
+         tl.srt = 45)
+```
+
+
+#### 6. Gráficos de dispersión pertinentes entre Y (biomasa), X2 (pH) y X3 (K)
+
+```{r}
+# Matriz de pares entre biomasa, pH y K con rectas ajustadas
+pairs(data2[, c("biomasa", "pH", "K")], 
+      main = "Dispersión entre Biomasa, pH y Potasio",
+      pch = 19, col = "steelblue",
+      panel = function(x, y, ...) {
+        points(x, y, ...)
+        abline(lm(y ~ x), col = "darkred", lwd = 2)
+      })
+```
+
+
+### b) Regresión Lineal Simple
+
+$$
+Y = \beta_0 + \beta_2 X_2 + \varepsilon
+$$
+
+```{r}
+mod_simple <- lm(biomasa ~ pH, data = data2)
+summary(mod_simple)
+```
+
+
+### c) Efecto de incorporar $X_3$ (K) controlando por $X_2$ (pH)
+
+#### I. Ajuste $Y \sim X_2$ y obtención de residuos $e_Y$
+
+```{r}
+mod_Y_X2 <- lm(biomasa ~ pH, data = data2)
+eY <- resid(mod_Y_X2)
+head(eY)
+```
+
+#### II. Ajuste $X_3 \sim X_2$ y obtención de residuos $e_{X_3}$
+
+```{r}
+mod_X3_X2 <- lm(K ~ pH, data = data2)
+eX3 <- resid(mod_X3_X2)
+head(eX3)
+```
+
+#### III. Gráfico de dispersión de $e_Y$ versus $e_{X_3}$
+
+```{r}
+plot(eX3, eY, 
+     pch = 19, col = "steelblue",
+     xlab = "Residuos de X3 ~ X2 (eX3)", 
+     ylab = "Residuos de Y ~ X2 (eY)",
+     main = "Gráfico de Dispersión de eY vs eX3")
+
+abline(h = 0, lty = 2, col = "gray50")
+abline(v = 0, lty = 2, col = "gray50")
+abline(lm(eY ~ eX3), col = "darkred", lwd = 2)
+```
+
+
+### d) Ajuste, en R y Python, el modelo eY = α + γeX3 + u y registre el valor de la pendiente estimada γ.
+
+$$
+e_Y = \alpha + \gamma e_{X_3} + u
+$$
+
+```{r}
+mod_residuos <- lm(eY ~ eX3)
+summary(mod_residuos)
+
+gamma_hat <- coef(mod_residuos)["eX3"]
+gamma_hat
+```
+
+### e) Regresión Lineal Múltiple
+
+$$
+Y = \beta_0 + \beta_2 X_2 + \beta_3 X_3 + \varepsilon
+$$
+
+```{r}
+mod_multiple <- lm(biomasa ~ pH + K, data = data2)
+summary(mod_multiple)
+
+beta3_hat <- coef(mod_multiple)["K"]
+beta3_hat
+
+# Comparación numérica exacta
+all.equal(as.numeric(beta3_hat), as.numeric(gamma_hat))
+abs(beta3_hat - gamma_hat)
+```
+
+
+### f) Explique por qué el coeficiente de $X_3$ obtenido en la regresión múltiple no corresponde, en general, al coeficiente que se obtendría ajustando solamente
+
+$$Y \sim X_3.$$
+
+
+## Ejercicio 3. Selección de variables y esperanza de vida
+
+### a) Análisis Exploratorio de Datos (EDA)
+
+#### 1. Lectura de datos y primeros registros
+
+```{r}
+data3 <- read.delim("esperanza.txt", sep = "\t")
+head(data3)
+```
+
+#### 2. Dimensiones y estructura de los datos
+
+```{r}
+dim(data3)
+str(data3)
+```
+
+#### 3. Revisión de valores faltantes
+
+```{r}
+colSums(is.na(data3))
+```
+
+#### 4. Medidas descriptivas
+
+```{r}
+summary(data3)
+```
+
+#### 5. Matriz de correlaciones y mapa de calor
+
+```{r}
+matriz_cor3 <- cor(data3)
+round(matriz_cor3, 3)
+
+corrplot(matriz_cor3, 
+         method = "color", 
+         type = "upper", 
+         addCoef.col = "black",
+         tl.col = "black", 
+         tl.srt = 45)
+```
+
+#### 6. Gráficos de dispersión: Esperanza de vida vs. Predictores
+
+```{r}
+data3 %>%
+  pivot_longer(cols = c(habitantes, ingresos, analfabetismo, asesinatos, 
+                        universitarios, heladas, area),
+               names_to = "predictor", 
+               values_to = "valor") %>%
+  ggplot(aes(x = valor, y = esp_vida)) +
+  geom_point(alpha = 0.7, color = "steelblue") +
+  geom_smooth(method = "lm", se = FALSE, color = "darkred") +
+  facet_wrap(~ predictor, scales = "free_x") +
+  theme_classic() +
+  labs(title = "Dispersión de Esperanza de Vida vs Predictores",
+       x = "Valor del Predictor",
+       y = "Esperanza de Vida (años)")
+```
+
+### b) Selección progresiva (Forward Selection) con alfa = 0.01
+
+```{r}
+mod_nulo <- lm(esp_vida ~ 1, data = data3)
+alcance_total <- formula(lm(esp_vida ~ habitantes + ingresos + analfabetismo + 
+                              asesinatos + universitarios + heladas + area, data = data3))
+```
+#### Etapa 1
+```{r}
+add1(mod_nulo, scope = alcance_total, test = "F")
+```
+#### Etapa 2
+```{r}
+mod_f1 <- lm(esp_vida ~ asesinatos, data = data3)
+add1(mod_f1, scope = alcance_total, test = "F")
+```
+#### Etapa 3
+```{r}
+mod_f2 <- lm(esp_vida ~ asesinatos + universitarios, data = data3)
+add1(mod_f2, scope = alcance_total, test = "F")
+```
+#### Modelo final Forward
+```{r}
+mod_forward <- mod_f2
+summary(mod_forward)
+```
+
+### c) Selección regresiva (Backward Selection) con alfa = 0.01
+```{r}
+mod_completo <- lm(esp_vida ~ habitantes + ingresos + analfabetismo + 
+                     asesinatos + universitarios + heladas + area, data = data3)
+```
+#### Etapa 1
+
+```{r}
+drop1(mod_completo, test = "F")
+```
+
+#### Etapa 2
+```{r}
+mod_b1 <- update(mod_completo, . ~ . - analfabetismo)
+drop1(mod_b1, test = "F")
+```
+#### Etapa 3
+```{r}
+mod_b2 <- update(mod_b1, . ~ . - ingresos)
+drop1(mod_b2, test = "F")
+```
+#### Etapa 4
+```{r}
+mod_b3 <- update(mod_b2, . ~ . - area)
+drop1(mod_b3, test = "F")
+```
+#### Etapa 5
+```{r}
+mod_b4 <- update(mod_b3, . ~ . - habitantes)
+drop1(mod_b4, test = "F")
+```
+#### Etapa 6
+```{r}
+mod_b5 <- update(mod_b4, . ~ . - heladas)
+drop1(mod_b5, test = "F")
+```
+#### Modelo final Backward
+```{r}
+mod_backward <- mod_b5
+summary(mod_backward)
+```
+### d) Selección Stepwise Bidireccional con $\alpha = 0.01$
+
+```{r}
+# Trayectoria manual paso a paso:
+# 1. Desde el modelo nulo entra 'asesinatos' .
+# 2. Con 'asesinatos', entra 'universitarios' .
+# 3. Revisión de eliminación en mod_step:
+drop1(lm(esp_vida ~ asesinatos + universitarios, data = data3), 
+      test = "F")
+
+# Ninguna variable se elimina porque ambas conservan p < 0.01.
+
+# 4. Revisión de incorporación adicional:
+add1(lm(esp_vida ~ asesinatos + universitarios, data = data3), 
+     scope = alcance_total, test = "F")
+
+# Ninguna variable restante cumple el criterio p < 0.01 para ingresar.
+
+mod_stepwise <- lm(esp_vida ~ asesinatos + universitarios, data = data3)
+summary(mod_stepwise)
+```
+
+
+
+### e) Comparación de Modelos y Justificación
+
+```{r}
+# Función de Cp de Mallows basada en la guía del docente
+Cp_calc <- function(mod_cand, mod_comp) {
+  n <- nrow(data3)
+  p <- length(coef(mod_cand))
+  s2_full <- summary(mod_comp)$sigma^2
+  
+  deviance(mod_cand) / s2_full - n + 2 * p
+}
+
+# Construcción de la tabla comparativa
+tabla_comparacion <- data.frame(
+  Modelo = c("Forward", "Backward", "Stepwise"),
+  R2_aj = c(summary(mod_forward)$adj.r.squared,
+            summary(mod_backward)$adj.r.squared,
+            summary(mod_stepwise)$adj.r.squared),
+  Cp = c(Cp_calc(mod_forward, mod_completo),
+         Cp_calc(mod_backward, mod_completo),
+         Cp_calc(mod_stepwise, mod_completo)),
+  AIC = c(AIC(mod_forward),
+          AIC(mod_backward),
+          AIC(mod_stepwise)),
+  BIC = c(BIC(mod_forward),
+          BIC(mod_backward),
+          BIC(mod_stepwise))
+)
+
+knitr::kable(tabla_comparacion, 
+             digits = 3, 
+             caption = "Tabla comparativa de criterios de selección")
+```
